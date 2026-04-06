@@ -3,7 +3,7 @@
 use std::{collections::HashMap, time::Instant};
 
 use plotters::prelude::*;
-use rand::Rng;
+use rand::{prelude::SliceRandom, Rng};
 
 /// Approach get: Convert &str to String, then use HashMap::get()
 fn search_approach_get(
@@ -69,8 +69,12 @@ fn main() {
         }
 
         // Collect existing keys for queries (to ensure hits)
-        let keys: Vec<(String, String)> =
-            map.keys().take(100).cloned().collect();
+        // Randomly sample 100 keys from all keys
+        let all_keys: Vec<(String, String)> = map.keys().cloned().collect();
+        let keys: Vec<(String, String)> = all_keys
+            .choose_multiple(&mut rng, 100.min(all_keys.len()))
+            .cloned()
+            .collect();
         let queries: Vec<(&str, &str)> = keys
             .iter()
             .map(|(k1, k2)| (k1.as_str(), k2.as_str()))
@@ -88,8 +92,12 @@ fn main() {
         }
 
         // Collect existing keys for queries (to ensure hits)
-        let keys: Vec<(String, String)> =
-            map_b.keys().take(100).cloned().collect();
+        // Randomly sample 100 keys from all keys
+        let all_keys: Vec<(String, String)> = map_b.keys().cloned().collect();
+        let keys: Vec<(String, String)> = all_keys
+            .choose_multiple(&mut rng, 100.min(all_keys.len()))
+            .cloned()
+            .collect();
         let queries: Vec<(&str, &str)> = keys
             .iter()
             .map(|(k1, k2)| (k1.as_str(), k2.as_str()))

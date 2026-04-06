@@ -5,16 +5,16 @@ use std::{collections::HashMap, time::Instant};
 use plotters::prelude::*;
 use rand::Rng;
 
-/// Approach A: Convert &str to String, then use HashMap::get()
-fn search_approach_a(
+/// Approach get: Convert &str to String, then use HashMap::get()
+fn search_approach_get(
     map: &HashMap<(String, String), u32>,
     key: (&str, &str),
 ) -> Option<u32> {
     map.get(&(key.0.to_string(), key.1.to_string())).copied()
 }
 
-/// Approach B: Iterate over HashMap, compare keys using as_str()
-fn search_approach_b(
+/// Approach iter: Iterate over HashMap, compare keys using as_str()
+fn search_approach_iter(
     map: &HashMap<(String, String), u32>,
     key: (&str, &str),
 ) -> Option<u32> {
@@ -55,8 +55,8 @@ fn main() {
     // Different HashMap sizes for X-axis
     let sizes: Vec<usize> = (100..=10_000).step_by(100).collect();
 
-    let mut results_a: Vec<f64> = Vec::new();
-    let mut results_b: Vec<f64> = Vec::new();
+    let mut results_get: Vec<f64> = Vec::new();
+    let mut results_iter: Vec<f64> = Vec::new();
 
     for &size in &sizes {
         // Build HashMap
@@ -76,16 +76,33 @@ fn main() {
             .map(|(k1, k2)| (k1.as_str(), k2.as_str()))
             .collect();
 
-        // Benchmark both approaches
-        let time_a = benchmark(&map, search_approach_a, &queries);
-        let time_b = benchmark(&map, search_approach_b, &queries);
+        let time_get = benchmark(&map, search_approach_get, &queries);
 
-        results_a.push(time_a);
-        results_b.push(time_b);
+        // Build a fresh HashMap for Approach iter to avoid CPU cache advantage
+        let mut map_b: HashMap<(String, String), u32> =
+            HashMap::with_capacity(size);
+        for i in 0..size {
+            let k1 = random_string(&mut rng, 10);
+            let k2 = random_string(&mut rng, 10);
+            map_b.insert((k1, k2), i as u32);
+        }
+
+        // Collect existing keys for queries (to ensure hits)
+        let keys: Vec<(String, String)> =
+            map_b.keys().take(100).cloned().collect();
+        let queries: Vec<(&str, &str)> = keys
+            .iter()
+            .map(|(k1, k2)| (k1.as_str(), k2.as_str()))
+            .collect();
+        let time_iter = benchmark(&map_b, search_approach_iter, &queries);
+
+        results_get.push(time_get);
+        results_iter.push(time_iter);
 
         println!(
-            "size={}, approach_A={:.2} ns/lookup, approach_B={:.2} ns/lookup",
-            size, time_a, time_b
+            "size={}, approach_get={:.2} ns/lookup, approach_iter={:.2} \
+             ns/lookup",
+            size, time_get, time_iter
         );
     }
 
@@ -94,13 +111,10 @@ fn main() {
         BitMapBackend::new("benchmark.png", (1200, 800)).into_drawing_area();
     root.fill(&WHITE).unwrap();
 
-    let max_y = results_b.iter().cloned().fold(f64::MIN, f64::max) * 1.1;
+    let max_y = results_iter.iter().cloned().fold(f64::MIN, f64::max) * 1.1;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption(
-            "HashMap Lookup: Approach A vs Approach B",
-            ("sans-serif", 30),
-        )
+        .caption("HashMap Lookup: get() vs iter()", ("sans-serif", 30))
         .margin(10)
         .x_label_area_size(60)
         .y_label_area_size(80)
@@ -116,35 +130,35 @@ fn main() {
         .draw()
         .unwrap();
 
-    // Approach A: Blue line
+    // Approach get: Blue line
     chart
         .draw_series(LineSeries::new(
             sizes
                 .iter()
-                .zip(results_a.iter())
+                .zip(results_get.iter())
                 .map(|(&x, &y)| (x as u32, y)),
             &BLUE,
         ))
         .unwrap()
-        .label("A: to_string() + get() [O(1)]")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+        .label("get() + to_string() [O(1)]")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
 
-    // Approach B: Red line
+    // Approach iter: Red line
     chart
         .draw_series(LineSeries::new(
             sizes
                 .iter()
-                .zip(results_b.iter())
+                .zip(results_iter.iter())
                 .map(|(&x, &y)| (x as u32, y)),
             &RED,
         ))
         .unwrap()
-        .label("B: iter() + as_str() [O(n)]")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+        .label("iter() + as_str() [O(n)]")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
 
     chart
         .configure_series_labels()
-        .border_style(&BLACK)
+        .border_style(BLACK)
         .draw()
         .unwrap();
 
